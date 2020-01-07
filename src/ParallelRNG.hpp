@@ -19,13 +19,15 @@ class ParallelRNG {
         bool activated = false;
     public:
         ~ParallelRNG() {
-            deinitialize();
+            if (activated) {
+                deinitialize();
+            }
         }
         void deinitialize() {
             for (size_t i = 0; i < quantity; i++) {
                 gsl_rng_free(generators[i]);
             }
-            delete generators;
+            delete[] generators;
             
             activated = false;
         }
@@ -61,7 +63,6 @@ class ParallelRNG {
         size_t getNumGenerators() {
             return quantity;
         }
-
 };
 
 #endif

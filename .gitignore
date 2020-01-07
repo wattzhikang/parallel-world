@@ -1,5 +1,7 @@
 .vscode
 bin/*
 doc/*
+scratch*
 
 *.bmp
+vgcore.*
