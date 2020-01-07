@@ -3,7 +3,7 @@ GEN = $(BIN)/generated-files
 
 MAIN := main
 
-CLASSES := DiamondSquare
+CLASSES := DiamondSquare CubeWorld
 
 OBJS := $(foreach CLASS,$(CLASSES),$(GEN)/$(CLASS).o)
 OBJS += $(GEN)/$(MAIN).o
