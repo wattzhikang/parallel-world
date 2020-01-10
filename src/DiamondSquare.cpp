@@ -192,7 +192,6 @@ void diamondSquare(CubeWorld& map) {
     size_t subdivisions = (size_t) log2(map.getSize() - 1);
 
     initializeMap(map, subdivisions, rng);
-    printTerrain(std::string("initialize.bmp"), map);
 
     for (size_t subdivision = 0; subdivision < subdivisions; subdivision++) {
         size_t sideSquares = pow(2,subdivision); /* 1 << n */
@@ -213,11 +212,6 @@ void diamondSquare(CubeWorld& map) {
                     diamondStep(map, rng, face, row, column, sideLength, sideSquares, RANGE, subdivision);
                 }
             }
-
-            printTerrain(
-                std::string("subdivision") + std::to_string(subdivision) + std::string("face") + std::to_string(face) + std::string(".bmp"),
-                map
-            );
         }
 
         t2 = omp_get_wtime();
@@ -228,7 +222,6 @@ void diamondSquare(CubeWorld& map) {
             << std::endl
         ;
 
-        printTerrain(std::string("output") + std::to_string(subdivision) + std::string(".bmp"), map);
     }
 }
 

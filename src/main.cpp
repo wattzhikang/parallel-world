@@ -12,7 +12,7 @@ void printStats(double timings[], size_t numTimings) {
     std::cout << "Standard Deviation:\t" << gsl_stats_sd(timings, 1, numTimings) << std::endl;
 }
 
-#define N 8
+#define N 10
 #define NUM_TIMINGS 5
 int main() {
     size_t length = pow(2, N) + 1;
@@ -32,7 +32,7 @@ int main() {
     std::cout << "====SERIAL TIMINGS====" << std::endl;
     printStats(serialTimings, NUM_TIMINGS);
     std::cout << std::endl;
-    //printTerrain(map);
+    printTerrain(map);
 
     //parallel timings
     // for (size_t i = 0; i < NUM_TIMINGS; i++) {

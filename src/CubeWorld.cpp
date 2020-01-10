@@ -1,5 +1,154 @@
 #include "CubeWorld.hpp"
 
+void CubeWorld::initializeMatricies() {
+    //                COS      SIN    0 ;  COS   SIN   0 ;  0    0    1
+    #define ROT0     {1.0,  -( 0.0), 0.0,  0.0,  1.0, 0.0, 0.0, 0.0, 1.0}
+    #define ROTPID2  {0.0,  -( 1.0), 0.0,  1.0,  0.0, 0.0, 0.0, 0.0, 1.0}
+    #define ROTPI    {-1.0, -( 0.0), 0.0,  0.0, -1.0, 0.0, 0.0, 0.0, 1.0}
+    #define ROT3PID2 {0.0,  -(-1.0), 0.0, -1.0,  0.0, 0.0, 0.0, 0.0, 1.0}
+    struct transform horizontalTransforms[6][4] =
+    {
+        { // right from face 0
+            {0, ROT0},
+            {1, ROT0},
+            {2, ROT0},
+            {3, ROT0}
+        },
+        { // right from face 1
+            {1, ROT0},
+            {2, ROT0},
+            {3, ROT0},
+            {0, ROT0}
+        },
+        { // right from face 2
+            {2, ROT0},
+            {3, ROT0},
+            {0, ROT0},
+            {1, ROT0}
+        },
+        { // right from face 3
+            {3, ROT0},
+            {0, ROT0},
+            {1, ROT0},
+            {2, ROT0}
+        },
+        { // right from face 4
+            {4, ROT0},
+            {1, ROT3PID2},
+            {5, ROTPI},
+            {3, ROTPID2}
+        },
+        { // right from face 5
+            {5, ROT0},
+            {1, ROTPID2},
+            {4, ROTPI},
+            {3, ROT3PID2}
+        }
+    };
+    struct transform verticalTransforms[6][4] =
+    {
+        { // up from face 0
+            {0, ROT0},
+            {4, ROT0},
+            {2, ROTPI},
+            {5, ROT0}
+        },
+        { // up from face 1
+            {1, ROT0},
+            {4, ROTPID2},
+            {3, ROTPI},
+            {5, ROT3PID2}
+        },
+        { // up from face 2
+            {2, ROT0},
+            {4, ROTPI},
+            {0, ROTPI},
+            {5, ROTPI}
+        },
+        { // up from face 3
+            {3, ROT0},
+            {4, ROT3PID2},
+            {1, ROTPI},
+            {5, ROTPID2}
+        },
+        { // up from face 4
+            {4, ROT0},
+            {2, ROTPI},
+            {5, ROT0},
+            {0, ROT0}
+        },
+        { // up from face 5
+            {5, ROT0},
+            {0, ROT0},
+            {4, ROT0},
+            {2, ROTPI}
+        }
+    };
+
+    double translate[9] = {1.0, 0.0, -((double)(size / 2)), 0.0, 1.0, -((double)(size / 2)), 0.0, 0.0, 1.0};
+    double backTranslate[9] = {1.0, 0.0, ((double)(size / 2)), 0.0, 1.0, ((double)(size / 2)), 0.0, 0.0, 1.0};
+
+    double C[9];
+
+    for (size_t face = 0; face < 6; face++) {
+        for (size_t hIndex = 0; hIndex < 4; hIndex++) {
+            for (size_t vIndex = 0; vIndex < 4; vIndex++)
+            {
+                cblas_dgemm(
+                    CblasRowMajor,
+                    CblasNoTrans,
+                    CblasNoTrans,
+                    3, 3,
+                    3,
+                    1.0,
+                    horizontalTransforms[face][hIndex].matrix,
+                    3,
+                    translate,
+                    3,
+                    0.0,
+                    C,
+                    3
+                );
+                memcpy(transformMap[face][hIndex][vIndex].matrix, C, 9 * sizeof(double));
+                cblas_dgemm(
+                    CblasRowMajor,
+                    CblasNoTrans,
+                    CblasNoTrans,
+                    3, 3,
+                    3,
+                    1.0,
+                    verticalTransforms[face][vIndex].matrix,
+                    3,
+                    transformMap[face][hIndex][vIndex].matrix,
+                    3,
+                    0.0,
+                    C,
+                    3
+                );
+                memcpy(transformMap[face][hIndex][vIndex].matrix, C, 9 * sizeof(double));
+                cblas_dgemm(
+                    CblasRowMajor,
+                    CblasNoTrans,
+                    CblasNoTrans,
+                    3, 3,
+                    3,
+                    1.0,
+                    backTranslate,
+                    3,
+                    transformMap[face][hIndex][vIndex].matrix,
+                    3,
+                    0.0,
+                    C,
+                    3
+                );
+                memcpy(transformMap[face][hIndex][vIndex].matrix, C, 9 * sizeof(double));
+
+                transformMap[face][hIndex][vIndex].face = verticalTransforms[horizontalTransforms[face][hIndex].face][vIndex].face;
+            }
+        }
+    }
+}
+
 long CubeWorld::getDisplacedFaces(long position) {
     if (position < 0) {
         return ((position + 1) / ((long)size)) - 1;
@@ -10,14 +159,6 @@ long CubeWorld::getDisplacedFaces(long position) {
     return 0;
 }
 
-char CubeWorld::displacementIndex(long facesDisplaced) {
-    if (facesDisplaced < 0) {
-        return (facesDisplaced % 4) + 4;
-    } else {
-        return facesDisplaced % 4;
-    }
-}
-
 void CubeWorld::navigate(char *face, long *x, long *y) {
     double xy[3] = {
         *x - getDisplacedFaces(*x) * ((long)size),
@@ -25,116 +166,40 @@ void CubeWorld::navigate(char *face, long *x, long *y) {
         1.0
     };
     double result[3];
-    double *transformations[4];
-    char multiplication = 0;
-    char multiplications = 3;
 
-    transformations[multiplication] = translate;
-    multiplication++;
-
-    long hIndex, vIndex;
-
-    // first handle horizontal face displacement, including the special cases
-    // of faces 4 and 5
-
-    switch (*face)
-    {
-    case 5:
-        hIndex = getDisplacedFaces(*x) % 4;
-        if (hIndex < 0) {
-            hIndex += 4;
-        }
-        transformations[multiplication] = face5TMosaic[hIndex].matrix;
-        multiplication++;
-        multiplications = 4;
-        switch (face5TMosaic[hIndex].face) { //set hIndex and vIndex for the vertical displacement phase
-            case 5:
-                hIndex = 0;
-                vIndex = 3;
-                break;
-            case 4:
-                hIndex = 0;
-                vIndex = 1;
-                break;
-            default:
-                hIndex = face5TMosaic[hIndex].face;
-                vIndex = 0;
-                break;
-        }
-        break;
-    case 4:
-        hIndex = getDisplacedFaces(*x) % 4;
-        if (hIndex < 0) {
-            hIndex += 4;
-        }
-        transformations[multiplication] = face4TMosaic[hIndex].matrix;
-        multiplication++;
-        multiplications = 4;
-        switch (face4TMosaic[hIndex].face) {
-            case 5:
-                hIndex = 0;
-                vIndex = 3;
-                break;
-            case 4:
-                hIndex = 0;
-                vIndex = 1;
-                break;
-            default:
-                hIndex = face4TMosaic[hIndex].face;
-                vIndex = 0;
-                break;
-        }
-        break;
-    default:
-        //hIndex should be the resulting face
-        hIndex = ( *face + getDisplacedFaces(*x)) % 4;
-        if (hIndex < 0) {
-            hIndex += 4;
-        }
-        vIndex = 0;
-        break;
+    long hIndex = getDisplacedFaces(*x) % 4;
+    if (hIndex < 0) {
+        hIndex += 4;
     }
-
-    // then handle vertical face displacement
-
-    vIndex += getDisplacedFaces(*y);
-    vIndex %= 4;
+    long vIndex = getDisplacedFaces(*y) % 4;
     if (vIndex < 0) {
         vIndex += 4;
     }
 
-    transformations[multiplication] = horizontalTMosaic[hIndex][vIndex].matrix;
-    multiplication++;
+    cblas_dgemv(
+        CblasRowMajor,
+        CblasNoTrans,
+        3, 3,
+        1.0,
+        transformMap[*face][hIndex][vIndex].matrix,
+        3,
+        xy,
+        1,
+        0.0,
+        result,
+        1
+    );
 
-    transformations[multiplication] = backTranslate;
-    multiplication++;
-
-    for (multiplication = 0; multiplication < multiplications; multiplication++) {
-        cblas_dgemv(
-            CblasRowMajor,
-            CblasNoTrans,
-            3, 3,
-            1.0,
-            transformations[multiplication],
-            3, 
-            xy,
-            1,
-            0.0,
-            result,
-            1
-        );
-        memcpy(xy, result, 3 * sizeof(double));
-    }
-
-    *face = horizontalTMosaic[hIndex][vIndex].face;
-    *x = (long) result[0];
-    *y = (long) result[1];
+    *y = result[1];
+    *x = result[0];
+    *face = transformMap[*face][hIndex][vIndex].face;
 }
 
 CubeWorld::CubeWorld(size_t size) : size(size) {
     for (size_t i = 0; i < 6; i++) {
         data[i] = gsl_matrix_alloc(size, size);
     }
+    initializeMatricies();
 }
 
 CubeWorld::~CubeWorld() {
