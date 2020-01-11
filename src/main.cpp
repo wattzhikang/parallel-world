@@ -12,7 +12,7 @@ void printStats(double timings[], size_t numTimings) {
     std::cout << "Standard Deviation:\t" << gsl_stats_sd(timings, 1, numTimings) << std::endl;
 }
 
-#define N 5
+#define N 9
 #define NUM_TIMINGS 5
 int main() {
     size_t length = pow(2, N) + 1;

@@ -60,7 +60,6 @@ void initializeMap(CubeWorld& map, size_t subdivisions, ParallelRNG& rng) {
 void squareStep(
     CubeWorld& map,
     ParallelRNG& rng,
-    char face,
     size_t row,
     size_t column,
     size_t sideLength,
@@ -68,25 +67,27 @@ void squareStep(
     double range,
     size_t subdivision)
 {
-    double sumAltitude = map.get(face, column*sideLength, row*sideLength);
-    sumAltitude       += map.get(face, column*sideLength, (row+1)*sideLength);
-    sumAltitude       += map.get(face, (column+1)*sideLength, row*sideLength);
-    sumAltitude       += map.get(face, (column+1)*sideLength, (row+1)*sideLength);
+    for (char face = 0; face < 6; face++)
+    {
+        double sumAltitude = map.get(face, column*sideLength, row*sideLength);
+        sumAltitude       += map.get(face, column*sideLength, (row+1)*sideLength);
+        sumAltitude       += map.get(face, (column+1)*sideLength, row*sideLength);
+        sumAltitude       += map.get(face, (column+1)*sideLength, (row+1)*sideLength);
 
-    double avgAltitude = sumAltitude / 4;
+        double avgAltitude = sumAltitude / 4;
 
-    map.set(
-        face,
-        column*sideLength + sideLength/2, //diamondX
-        row*sideLength + sideLength/2,    //diamondY
-        randHeight(rng, avgAltitude, range, subdivision)
-    );
+        map.set(
+            face,
+            column*sideLength + sideLength/2, //diamondX
+            row*sideLength + sideLength/2,    //diamondY
+            randHeight(rng, avgAltitude, range, subdivision)
+        );
+    }
 }
 
 void diamondStep (
     CubeWorld& map,
     ParallelRNG& rng,
-    char face,
     size_t row,
     size_t column,
     size_t sideLength,
@@ -99,7 +100,7 @@ void diamondStep (
     size_t diamondY = row*sideLength + halfEdge;
 
     size_t squareX, squareY;
-    double sumAltitude, setAltitude;
+    double sumAltitude[6], setAltitude[6];
 
     /*
         This is a bit convoluted. The whole point is to calculate the locations of the upper-middle,
@@ -135,47 +136,142 @@ void diamondStep (
         squareX = diamondX + halfEdge*multiples[direction][X];
         squareY = diamondY + halfEdge*multiples[direction][Y];
 
-        sumAltitude  = 0;
+        sumAltitude[0] = 0;
+        sumAltitude[1] = 0;
+        sumAltitude[2] = 0;
+        sumAltitude[3] = 0;
+        sumAltitude[4] = 0;
+        sumAltitude[5] = 0;
 
         if (direction == UP && row == sideSquares - 1) {
-            sumAltitude += map.get(face, squareX, squareY + halfEdge + 1);
+            sumAltitude[0] += map.get(0, squareX, squareY + halfEdge + 1);
+            sumAltitude[1] += map.get(1, squareX, squareY + halfEdge + 1);
+            sumAltitude[2] += map.get(2, squareX, squareY + halfEdge + 1);
+            sumAltitude[3] += map.get(3, squareX, squareY + halfEdge + 1);
+            sumAltitude[4] += map.get(4, squareX, squareY + halfEdge + 1);
+            sumAltitude[5] += map.get(5, squareX, squareY + halfEdge + 1);
         } else {
-            sumAltitude += map.get(face, squareX, squareY + halfEdge);
+            sumAltitude[0] += map.get(0, squareX, squareY + halfEdge);
+            sumAltitude[1] += map.get(1, squareX, squareY + halfEdge);
+            sumAltitude[2] += map.get(2, squareX, squareY + halfEdge);
+            sumAltitude[3] += map.get(3, squareX, squareY + halfEdge);
+            sumAltitude[4] += map.get(4, squareX, squareY + halfEdge);
+            sumAltitude[5] += map.get(5, squareX, squareY + halfEdge);
         }
         if (direction == LEFT && column == 0) {
-            sumAltitude += map.get(face, squareX - halfEdge - 1, squareY);
+            sumAltitude[0] += map.get(0, squareX - halfEdge - 1, squareY);
+            sumAltitude[1] += map.get(1, squareX - halfEdge - 1, squareY);
+            sumAltitude[2] += map.get(2, squareX - halfEdge - 1, squareY);
+            sumAltitude[3] += map.get(3, squareX - halfEdge - 1, squareY);
+            sumAltitude[4] += map.get(4, squareX - halfEdge - 1, squareY);
+            sumAltitude[5] += map.get(5, squareX - halfEdge - 1, squareY);
         } else {
-            sumAltitude += map.get(face, squareX - halfEdge, squareY);
+            sumAltitude[0] += map.get(0, squareX - halfEdge, squareY);
+            sumAltitude[1] += map.get(1, squareX - halfEdge, squareY);
+            sumAltitude[2] += map.get(2, squareX - halfEdge, squareY);
+            sumAltitude[3] += map.get(3, squareX - halfEdge, squareY);
+            sumAltitude[4] += map.get(4, squareX - halfEdge, squareY);
+            sumAltitude[5] += map.get(5, squareX - halfEdge, squareY);
         }
         if (direction == DOWN && row == 0) {
-            sumAltitude += map.get(face, squareX, squareY - halfEdge - 1);
+            sumAltitude[0] += map.get(0, squareX, squareY - halfEdge - 1);
+            sumAltitude[1] += map.get(1, squareX, squareY - halfEdge - 1);
+            sumAltitude[2] += map.get(2, squareX, squareY - halfEdge - 1);
+            sumAltitude[3] += map.get(3, squareX, squareY - halfEdge - 1);
+            sumAltitude[4] += map.get(4, squareX, squareY - halfEdge - 1);
+            sumAltitude[5] += map.get(5, squareX, squareY - halfEdge - 1);
         } else {
-            sumAltitude += map.get(face, squareX, squareY - halfEdge);
+            sumAltitude[0] += map.get(0, squareX, squareY - halfEdge);
+            sumAltitude[1] += map.get(1, squareX, squareY - halfEdge);
+            sumAltitude[2] += map.get(2, squareX, squareY - halfEdge);
+            sumAltitude[3] += map.get(3, squareX, squareY - halfEdge);
+            sumAltitude[4] += map.get(4, squareX, squareY - halfEdge);
+            sumAltitude[5] += map.get(5, squareX, squareY - halfEdge);
         }
         if (direction == RIGHT && column == sideSquares - 1) {
-            sumAltitude += map.get(face, squareX + halfEdge + 1, squareY);
+            sumAltitude[0] += map.get(0, squareX + halfEdge + 1, squareY);
+            sumAltitude[1] += map.get(1, squareX + halfEdge + 1, squareY);
+            sumAltitude[2] += map.get(2, squareX + halfEdge + 1, squareY);
+            sumAltitude[3] += map.get(3, squareX + halfEdge + 1, squareY);
+            sumAltitude[4] += map.get(4, squareX + halfEdge + 1, squareY);
+            sumAltitude[5] += map.get(5, squareX + halfEdge + 1, squareY);
         } else {
-            sumAltitude += map.get(face, squareX + halfEdge, squareY);
+            sumAltitude[0] += map.get(0, squareX + halfEdge, squareY);
+            sumAltitude[1] += map.get(1, squareX + halfEdge, squareY);
+            sumAltitude[2] += map.get(2, squareX + halfEdge, squareY);
+            sumAltitude[3] += map.get(3, squareX + halfEdge, squareY);
+            sumAltitude[4] += map.get(4, squareX + halfEdge, squareY);
+            sumAltitude[5] += map.get(5, squareX + halfEdge, squareY);
         }
 
         map.set(
-            face,
+            0,
             squareX,
             squareY,
-            setAltitude = randHeight(rng, sumAltitude / 4, range, subdivision)
+            setAltitude[0] = randHeight(rng, sumAltitude[0] / 4, range, subdivision)
+        );
+        map.set(
+            1,
+            squareX,
+            squareY,
+            setAltitude[1] = randHeight(rng, sumAltitude[1] / 4, range, subdivision)
+        );
+        map.set(
+            2,
+            squareX,
+            squareY,
+            setAltitude[2] = randHeight(rng, sumAltitude[2] / 4, range, subdivision)
+        );
+        map.set(
+            3,
+            squareX,
+            squareY,
+            setAltitude[3] = randHeight(rng, sumAltitude[3] / 4, range, subdivision)
+        );
+        map.set(
+            4,
+            squareX,
+            squareY,
+            setAltitude[4] = randHeight(rng, sumAltitude[4] / 4, range, subdivision)
+        );
+        map.set(
+            5,
+            squareX,
+            squareY,
+            setAltitude[5] = randHeight(rng, sumAltitude[5] / 4, range, subdivision)
         );
 
         if (direction == UP && row == sideSquares - 1) {
-            map.set(face, squareX, squareY + 1, setAltitude);
+            map.set(0, squareX, squareY + 1, setAltitude[0]);
+            map.set(1, squareX, squareY + 1, setAltitude[1]);
+            map.set(2, squareX, squareY + 1, setAltitude[2]);
+            map.set(3, squareX, squareY + 1, setAltitude[3]);
+            map.set(4, squareX, squareY + 1, setAltitude[4]);
+            map.set(5, squareX, squareY + 1, setAltitude[5]);
         }
         if (direction == LEFT && column == 0) {
-            map.set(face, squareX - 1, squareY, setAltitude);
+            map.set(0, squareX - 1, squareY, setAltitude[0]);
+            map.set(1, squareX - 1, squareY, setAltitude[1]);
+            map.set(2, squareX - 1, squareY, setAltitude[2]);
+            map.set(3, squareX - 1, squareY, setAltitude[3]);
+            map.set(4, squareX - 1, squareY, setAltitude[4]);
+            map.set(5, squareX - 1, squareY, setAltitude[5]);
         }
         if (direction == DOWN && row == 0) {
-            map.set(face, squareX, squareY - 1, setAltitude);
+            map.set(0, squareX, squareY - 1, setAltitude[0]);
+            map.set(1, squareX, squareY - 1, setAltitude[1]);
+            map.set(2, squareX, squareY - 1, setAltitude[2]);
+            map.set(3, squareX, squareY - 1, setAltitude[3]);
+            map.set(4, squareX, squareY - 1, setAltitude[4]);
+            map.set(5, squareX, squareY - 1, setAltitude[5]);
         }
         if (direction == RIGHT && column == sideSquares - 1) {
-            map.set(face, squareX + 1, squareY, setAltitude);
+            map.set(0, squareX + 1, squareY, setAltitude[0]);
+            map.set(1, squareX + 1, squareY, setAltitude[1]);
+            map.set(2, squareX + 1, squareY, setAltitude[2]);
+            map.set(3, squareX + 1, squareY, setAltitude[3]);
+            map.set(4, squareX + 1, squareY, setAltitude[4]);
+            map.set(5, squareX + 1, squareY, setAltitude[5]);
         }
     }
 }
@@ -201,16 +297,14 @@ void diamondSquare(CubeWorld& map) {
 
         t1 = omp_get_wtime();
 
-        for (size_t face = 0; face < 6; face++) {
-            for (size_t row = 0; row < sideSquares; row++) {
-                for (size_t column = 0; column < sideSquares; column++) {
-                    squareStep(map, rng, face, row, column, sideLength, sideSquares, RANGE, subdivision);
-                }
+        for (size_t row = 0; row < sideSquares; row++) {
+            for (size_t column = 0; column < sideSquares; column++) {
+                squareStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
             }
-            for (size_t row = 0; row < sideSquares; row++) {
-                for (size_t column = 0; column < sideSquares; column++) {
-                    diamondStep(map, rng, face, row, column, sideLength, sideSquares, RANGE, subdivision);
-                }
+        }
+        for (size_t row = 0; row < sideSquares; row++) {
+            for (size_t column = 0; column < sideSquares; column++) {
+                diamondStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
             }
         }
 
@@ -236,44 +330,42 @@ void diamondSquareParallel(CubeWorld& map) {
 
     initializeMap(map, subdivisions, rng);
 
+    #pragma omp parallel
+    {
     for (size_t subdivision = 0; subdivision < subdivisions; subdivision++) {
         size_t sideSquares = pow(2,subdivision); /* 1 << n */
         size_t sideLength = (map.getSize() - 1) / sideSquares; /* (length - 1) >> n */
 
+        #pragma omp single
+        {
+        rng.reinitialize();
+        }
+
         t1 = omp_get_wtime();
 
-        #pragma omp parallel
-        {
         #pragma omp for
-        for (size_t face = 0; face < 6; face++) {
-            #pragma omp parallel
-            {
-            #pragma single
-            {
-            rng.reinitialize();
-            }
-            #pragma omp for
-            for (size_t row = 0; row < sideSquares; row++) {
-                for (size_t column = 0; column < sideSquares; column++) {
-                    squareStep(map, rng, face, row, column, sideLength, sideSquares, RANGE, subdivision);
-                }
-            }
-            #pragma omp for
-            for (size_t row = 0; row < sideSquares; row++) {
-                for (size_t column = 0; column < sideSquares; column++) {
-                    diamondStep(map, rng, face, row, column, sideLength, sideSquares, RANGE, subdivision);
-                }
-            }
+        for (size_t row = 0; row < sideSquares; row++) {
+            for (size_t column = 0; column < sideSquares; column++) {
+                squareStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
             }
         }
+        #pragma omp for
+        for (size_t row = 0; row < sideSquares; row++) {
+            for (size_t column = 0; column < sideSquares; column++) {
+                diamondStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
+            }
         }
 
-        t2 = omp_get_wtime();
-        std::cout
-            << std::string("Squares: ") + std::to_string(((size_t)pow(sideSquares, 2)) * 6) + std::string("\t")
-            << std::to_string((pow(sideSquares, 2) * 6) / (t2 - t1)) + std::string(" squares/second\t")
-            << std::string("Generators: ") + std::to_string(rng.getNumGenerators())
-            << std::endl
-        ;
+        #pragma omp single
+        {
+            t2 = omp_get_wtime();
+            std::cout
+                << std::string("Squares: ") + std::to_string(((size_t)pow(sideSquares, 2)) * 6) + std::string("\t")
+                << std::to_string((pow(sideSquares, 2) * 6) / (t2 - t1)) + std::string(" squares/second\t")
+                << std::string("Generators: ") + std::to_string(rng.getNumGenerators())
+                << std::endl
+            ;
+        }
+    }
     }
 }
