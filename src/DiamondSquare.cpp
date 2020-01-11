@@ -216,7 +216,7 @@ void diamondSquare(CubeWorld& map) {
 
         t2 = omp_get_wtime();
         std::cout
-            << std::string("Squares: ") + std::to_string(pow(sideSquares, 2) * 6) + std::string("\t")
+            << std::string("Squares: ") + std::to_string(((size_t)pow(sideSquares, 2)) * 6) + std::string("\t")
             << std::to_string((pow(sideSquares, 2) * 6) / (t2 - t1)) + std::string(" squares/second\t")
             << std::string("Generators: ") + std::to_string(rng.getNumGenerators())
             << std::endl
@@ -225,67 +225,55 @@ void diamondSquare(CubeWorld& map) {
     }
 }
 
-// This is the parallel version of the algorithm.
-// void diamondSquareParallel(Array2D<double>& map, size_t length) {
-//     double t1, t2;
+void diamondSquareParallel(CubeWorld& map) {
+    double t1, t2;
 
-//     ParallelRNG rng;
-//     rng.reinitialize();
+    ParallelRNG rng;
+    rng.reinitialize();
 
-//     //number of times the map will be subdivided
-//     size_t subdivisions = (size_t) log2(length - 1);
+    //number of times the map will be subdivided
+    size_t subdivisions = (size_t) log2(map.getSize() - 1);
 
-//     //initialize map
-//     map.set(0, 0, randHeight(rng, 0.5, RANGE, 0));
-//     map.set(0, length - 1, randHeight(rng, 0.5, RANGE, 0));
-//     map.set(length - 1, 0, randHeight(rng, 0.5 , RANGE, 0));
-//     map.set(length - 1, length - 1, randHeight(rng, 0.5 , RANGE, 0));
+    initializeMap(map, subdivisions, rng);
 
-//     #pragma omp parallel shared(map)
-//     {
-    
-//     #pragma omp single
-//     {
-//     // The random number generator must be initialized in the same parallel region
-//     // that it will be used in, before it is used. Otherwise it may not have the
-//     // appropriate number of generators.
-//     rng.reinitialize();
-//     }
+    for (size_t subdivision = 0; subdivision < subdivisions; subdivision++) {
+        size_t sideSquares = pow(2,subdivision); /* 1 << n */
+        size_t sideLength = (map.getSize() - 1) / sideSquares; /* (length - 1) >> n */
 
-//     for (size_t subdivision = 0; subdivision < subdivisions; subdivision++) {
-//         size_t sideSquares = pow(2,subdivision); // The number of cells in each row and column
-//         size_t sideLength = (length - 1) / sideSquares; // The number of verticies on each cell's side
+        t1 = omp_get_wtime();
 
-//         #pragma omp single
-//         {
-//         t1 = omp_get_wtime();
-//         }
+        #pragma omp parallel
+        {
+        #pragma omp for
+        for (size_t face = 0; face < 6; face++) {
+            #pragma omp parallel
+            {
+            #pragma single
+            {
+            rng.reinitialize();
+            }
+            #pragma omp for
+            for (size_t row = 0; row < sideSquares; row++) {
+                for (size_t column = 0; column < sideSquares; column++) {
+                    squareStep(map, rng, face, row, column, sideLength, sideSquares, RANGE, subdivision);
+                }
+            }
+            #pragma omp for
+            for (size_t row = 0; row < sideSquares; row++) {
+                for (size_t column = 0; column < sideSquares; column++) {
+                    diamondStep(map, rng, face, row, column, sideLength, sideSquares, RANGE, subdivision);
+                }
+            }
+            }
+        }
+        }
 
-//         #pragma omp for schedule(auto)
-//         for (size_t row = 0; row < sideSquares; row++) {
-//             for (size_t column = 0; column < sideSquares; column++) {
-//                 squareStep(map, rng, row, column, sideLength, RANGE, subdivision);
-//             }
-//         }
-//         // These loops cannot be combined because the results of the diamond step depend on the results of
-//         // the square step.
-//         #pragma omp for schedule(auto)
-//         for (size_t row = 0; row < sideSquares; row++) {
-//             for (size_t column = 0; column < sideSquares; column++) {
-//                 diamondStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
-//             }
-//         }
-
-//         #pragma omp single
-//         {
-//         t2 = omp_get_wtime();
-//         std::cout
-//             << std::string("Squares: ") + std::to_string(pow(sideSquares, 2)) + std::string("\t")
-//             << std::to_string((pow(sideSquares, 2)) / (t2 - t1)) + std::string(" squares/second\t")
-//             << std::string("Generators: ") + std::to_string(rng.getNumGenerators())
-//             << std::endl
-//         ;
-//         }
-//     }
-//     }
-// }
+        t2 = omp_get_wtime();
+        std::cout
+            << std::string("Squares: ") + std::to_string(((size_t)pow(sideSquares, 2)) * 6) + std::string("\t")
+            << std::to_string((pow(sideSquares, 2) * 6) / (t2 - t1)) + std::string(" squares/second\t")
+            << std::string("Generators: ") + std::to_string(rng.getNumGenerators())
+            << std::endl
+        ;
+    }
+}

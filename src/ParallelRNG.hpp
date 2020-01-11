@@ -18,6 +18,9 @@ class ParallelRNG {
         size_t quantity = 0;
         bool activated = false;
     public:
+        ParallelRNG() {
+            initialize();
+        }
         ~ParallelRNG() {
             if (activated) {
                 deinitialize();
@@ -31,11 +34,7 @@ class ParallelRNG {
             
             activated = false;
         }
-        void reinitialize() {
-            if (activated) {
-                deinitialize();
-            }
-
+        void initialize() {
             quantity = omp_get_num_threads();
 
             generators = new gsl_rng*[quantity];
@@ -50,6 +49,14 @@ class ParallelRNG {
             gsl_rng_free(seeder);
 
             activated = true;
+        }
+        void reinitialize() {
+            if (quantity != omp_get_num_threads()) {
+                if (activated) {
+                    deinitialize();
+                }
+                initialize();
+            }
         }
         double getDouble() {
             if (activated) {
