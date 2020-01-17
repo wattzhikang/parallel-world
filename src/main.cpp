@@ -10,53 +10,108 @@
 struct options
 {
     bool failure;
+    const char* failureMsg;
     bool readInput;
-    char *inputFileName;
+    const char *inputFileName;
     size_t mapSize;
     bool writeOutput;
-    char *outputFileName;
+    const char *outputFileName;
+    bool benchmark;
+    size_t benchmarkIntervals;
 };
 
-int argInputFile(int argIndex, char *argv[], struct options *opts) {
+int argInputFile(int argIndex, int argc, char *argv[], struct options *opts) {
     opts->readInput = true;
-    opts->inputFileName = argv[argIndex];
+    
+    if (argIndex < argc) {
+        opts->inputFileName = argv[argIndex];
+    } else {
+        opts->failure = true;
+        opts->failureMsg = "You must specify a file name.";
+    }
+
     return argIndex + 1;
 }
 
-int argMapSize(int argIndex, char *argv[], struct options *opts) {
-    char *endptr;
-    long size = strtol(argv[argIndex], &endptr, 0);
-    opts->mapSize = size;
-    if (endptr == argv[argIndex]) {
+int argMapSize(int argIndex, int argc, char *argv[], struct options *opts) {
+    if (argIndex < argc) {
+        char *endptr;
+        long size = strtol(argv[argIndex], &endptr, 0);
+        opts->mapSize = size;
+        if (endptr == argv[argIndex]) {
+            opts->failure = true;
+            opts->failureMsg = "You must specify an integer 2^n + 1 for the map size";
+        }
+    } else {
         opts->failure = true;
+        opts->failureMsg = "You must specify an integer 2^n + 1 for the map size";
     }
     return argIndex + 1;
 }
 
-int argOutputFile(int argIndex, char *argv[], struct options *opts) {
+int argOutputFile(int argIndex, int argc, char *argv[], struct options *opts) {
     opts->writeOutput = true;
-    opts->outputFileName = argv[argIndex];
+    
+    if (argIndex < argc) {
+        opts->outputFileName = argv[argIndex];
+    } else {
+        opts->failure = true;
+        opts->failureMsg = "You must specify a file name.";
+    }
+    return argIndex + 1;
+}
+
+int argBenchmark(int argIndex, int argc, char *argv[], struct options *opts) {
+    opts->benchmark = true;
+
+    if (argIndex < argc) {
+        char *endptr;
+        long intervals = strtol(argv[argIndex], &endptr, 0);
+        if (endptr == argv[argIndex]) {
+            opts->failure = true;
+            opts->failureMsg = "You must specify the number of intervals";
+        }
+        opts->benchmarkIntervals = (int) intervals;
+    } else {
+        opts->failure = true;
+        opts->failureMsg = "You must specify the number of intervals";
+    }
+
     return argIndex + 1;
 }
 
 struct options parseArguments(int argc, char *argv[]) {
     int argIndex = 1;
     struct options opts = {
-        .failure =          false,
-        .readInput =        false,
-        .inputFileName =    NULL,
-        .mapSize =          5,
-        .writeOutput =      false,
-        .outputFileName =   NULL
+        .failure =              false,
+        .readInput =            false,
+        .inputFileName =        NULL,
+        .mapSize =              5,
+        .writeOutput =          false,
+        .outputFileName =       NULL,
+        .benchmark =            false,
+        .benchmarkIntervals =   0
     };
     while (argIndex < argc) {
-        if (!strncmp(argv[argIndex], "-i", 3)) {
-            argIndex = argInputFile(argIndex + 1, argv, &opts);
-        } else if (!strncmp(argv[argIndex], "-s", 3)) {
-            argIndex = argMapSize(argIndex + 1, argv, &opts);
-        } else if (!strncmp(argv[argIndex], "-o", 3)) {
-            argIndex = argOutputFile(argIndex + 1, argv, &opts);
-        } else {
+        if (!strncmp(argv[argIndex], "-i", 3))
+        {
+            argIndex = argInputFile(argIndex + 1, argc, argv, &opts);
+        }
+        else if (!strncmp(argv[argIndex], "-s", 3))
+        {
+            argIndex = argMapSize(argIndex + 1, argc, argv, &opts);
+        }
+        else if (!strncmp(argv[argIndex], "-o", 3))
+        {
+            argIndex = argOutputFile(argIndex + 1, argc, argv, &opts);
+        }
+        else if
+            (!strncmp(argv[argIndex], "-b", 3) ||
+             !strncmp(argv[argIndex], "--benchmark", 3))
+        {
+            argIndex = argBenchmark(argIndex + 1, argc, argv, &opts);
+        }
+        else {
             opts.failure = true;
         }
         if (opts.failure) {
@@ -73,7 +128,7 @@ void printStats(double timings[], size_t numTimings) {
 
 const char *help[] = {
     "Usage:",
-    "\tparallel-world [-i <input_file>] [-s <map_size>] [-o <output_file>]",
+    "\tparallel-world [-i <input_file>] [-s <map_size>] [-o <output_file>] [-b|--benchmark <intervals>]",
     "\t",
     "\tMap size is the length of the side of a map. It must be 2^n + 1",
     "\t\twhere n is any positive integer."
@@ -85,12 +140,13 @@ void printHelp() {
     }
 }
 
-#define N 9
-#define NUM_TIMINGS 5
 int main(int argc, char *argv[]) {
     struct options opts = parseArguments(argc, argv);
 
     if (opts.failure) {
+        if (opts.failureMsg != NULL) {
+            std::cout << opts.failureMsg << "\n" << std::endl;
+        }
         printHelp();
         return 0;
     }
@@ -101,7 +157,40 @@ int main(int argc, char *argv[]) {
 
     CubeWorld map(opts.mapSize);
 
-    diamondSquareParallel(map);
+    if (opts.benchmark) {
+        double   serialTimes[opts.benchmarkIntervals];
+        double parallelTimes[opts.benchmarkIntervals];
+
+        for (size_t i = 0; i < opts.benchmarkIntervals; i++) {
+            double t1 = omp_get_wtime();
+            diamondSquare(map);
+            std::cout
+                << "Generation Time: "
+                << (serialTimes[i] = omp_get_wtime() - t1)
+                << "s"
+                << std::endl
+            ;
+        }
+        std::cout << "\nSERIAL TIMINGS" << std::endl;
+        printStats(serialTimes, opts.benchmarkIntervals);
+        std::cout << std::endl;
+
+        for (size_t i = 0; i < opts.benchmarkIntervals; i++) {
+            double t1 = omp_get_wtime();
+            diamondSquareParallel(map);
+            std::cout
+                << "Generation Time: "
+                << (parallelTimes[i] = omp_get_wtime() - t1)
+                << "s"
+                << std::endl
+            ;
+        }
+        std::cout << "\nPARALLEL TIMINGS" << std::endl;
+        printStats(parallelTimes, opts.benchmarkIntervals);
+        std::cout << std::endl;
+    } else {
+        diamondSquareParallel(map);
+    }
 
     if (opts.writeOutput)
     {
