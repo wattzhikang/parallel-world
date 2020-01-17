@@ -80,6 +80,22 @@ int argBenchmark(int argIndex, int argc, char *argv[], struct options *opts) {
     return argIndex + 1;
 }
 
+int argPower(int argIndex, int argc, char *argv[], struct options *opts) {
+    if (argIndex < argc) {
+        char *endptr;
+        long size = strtol(argv[argIndex], &endptr, 0);
+        opts->mapSize = (1 << size) + 1;
+        if (endptr == argv[argIndex]) {
+            opts->failure = true;
+            opts->failureMsg = "You must specify an integer for the map power size";
+        }
+    } else {
+        opts->failure = true;
+        opts->failureMsg = "You must specify an integer for the map power size";
+    }
+    return argIndex + 1;
+}
+
 struct options parseArguments(int argc, char *argv[]) {
     int argIndex = 1;
     struct options opts = {
@@ -107,11 +123,16 @@ struct options parseArguments(int argc, char *argv[]) {
         }
         else if
             (!strncmp(argv[argIndex], "-b", 3) ||
-             !strncmp(argv[argIndex], "--benchmark", 3))
+             !strncmp(argv[argIndex], "--benchmark", 11))
         {
             argIndex = argBenchmark(argIndex + 1, argc, argv, &opts);
         }
-        else {
+        else if (!strncmp(argv[argIndex], "--power", 7))
+        {
+            argIndex = argPower(argIndex + 1, argc, argv, &opts);
+        }
+        else
+        {
             opts.failure = true;
         }
         if (opts.failure) {
@@ -128,7 +149,8 @@ void printStats(double timings[], size_t numTimings) {
 
 const char *help[] = {
     "Usage:",
-    "\tparallel-world [-i <input_file>] [-s <map_size>] [-o <output_file>] [-b|--benchmark <intervals>]",
+    "\tparallel-world [-i <input_file>] [-s <map_size> | -p <map_power>] [-o <output_file>]",
+    "\t\t[-b|--benchmark <intervals>]",
     "\t",
     "\tMap size is the length of the side of a map. It must be 2^n + 1",
     "\t\twhere n is any positive integer."
