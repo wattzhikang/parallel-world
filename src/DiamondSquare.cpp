@@ -1,3 +1,5 @@
+///@file
+
 #include "DiamondSquare.hpp"
 
 #include <omp.h>
@@ -6,13 +8,26 @@
 
 #include "ParallelRNG.hpp"
 
-// Returns the height, based on the supplied average height, and factored down by the current subdivision depth
-double randHeight(ParallelRNG& rng, double avg, double range, size_t subdivision) {
-    return avg + rng.getDoublePlusMinus() * (range / (1 << subdivision) /*pow(2, subdivision)*/);
+/**
+ * Returns the height, based on the supplied average height, and factored down by the current subdivision depth
+ * @param rng The random number generator, to supply randomness
+ * @param avg The average of the surrounding terrain, however you define it
+ * @param range To specify the maximum amount by which to displace the terrain
+ * @param subdivision This function reduces the range by a factor of 2 for every subdivison
+*/
+double randHeight(ParallelRNGSequence* rng, double avg, double range, size_t subdivision) {
+    return avg + rng->getDoublePlusMinus() * (range / (1 << subdivision) /*pow(2, subdivision)*/);
 }
 
 #define RANGE 0.5
-void initializeMap(CubeWorld& map, size_t subdivisions, ParallelRNG& rng) {
+
+/**
+ * Initializes the 4 corners on each face. All adjacent corner pixels are given the same value
+ * @param map The map
+ * @param subdivisions
+ * @param rng The random number generator
+*/
+void initializeMap(CubeWorld& map, size_t subdivisions, ParallelRNGSequence* rng) {
     //initialize map
     //face 4 corners
     double face4LowerLeft = randHeight(rng, 0.5, RANGE, 0);
@@ -56,10 +71,19 @@ void initializeMap(CubeWorld& map, size_t subdivisions, ParallelRNG& rng) {
     map.set(5, map.getSize() - 1, map.getSize() - 1, face5UpperRight);
 }
 
-// Performs the square step. This is fairly straightforward.
+/** Performs the square step. This is fairly straightforward.
+ * @param map The map to manipulate
+ * @param rng The random number generator sequence to use (see ParallelRNG)
+ * @param row The row being manipulated, according to the current subdivision's partition scheme
+ * @param column The column being manipulated, according to the current subdivision's partition scheme
+ * @param sideLength The size of a single square, in pixels, according to the current subdivision's partition scheme
+ * @param sideSquares The numer of vertical or horizontal squares the face has been divided into
+ * @param range See randHeight()
+ * @param subdivision The current subdivisions
+*/
 void squareStep(
     CubeWorld& map,
-    ParallelRNG& rng,
+    ParallelRNGSequence* rng,
     size_t row,
     size_t column,
     size_t sideLength,
@@ -67,6 +91,7 @@ void squareStep(
     double range,
     size_t subdivision)
 {
+    //Does the same thing to all 6 faces of the cube
     for (char face = 0; face < 6; face++)
     {
         double sumAltitude = map.get(face, column*sideLength, row*sideLength);
@@ -85,9 +110,20 @@ void squareStep(
     }
 }
 
+/**
+ * Performs the diamond step
+ * @param map The map to manipulate
+ * @param rng The random number generator to use
+ * @param row The row being manipulated, according to the current subdivision's partition scheme
+ * @param column The column being manipulated, according to the current subdivision's partition scheme
+ * @param sideLength The size of a single square, in pixels, according to the current subdivision's partition scheme
+ * @param sideSquares The numer of vertical or horizontal squares the face has been divided into
+ * @param range See randHeight()
+ * @param subdivision The current subdivisions
+*/
 void diamondStep (
     CubeWorld& map,
-    ParallelRNG& rng,
+    ParallelRNGSequence* rng,
     size_t row,
     size_t column,
     size_t sideLength,
@@ -136,6 +172,12 @@ void diamondStep (
         squareX = diamondX + halfEdge*multiples[direction][X];
         squareY = diamondY + halfEdge*multiples[direction][Y];
 
+        /*
+         * This entire sequence is unfolded, mostly because it wouldn't look any
+         * better to do this with loops. The reason why there is so much repetition
+         * here is because it wouldn't look any better to use loops.
+        */
+
         sumAltitude[0] = 0;
         sumAltitude[1] = 0;
         sumAltitude[2] = 0;
@@ -143,6 +185,9 @@ void diamondStep (
         sumAltitude[4] = 0;
         sumAltitude[5] = 0;
 
+        //if this square side is on the edge of a face, then the pixel it needs
+        //to read is one pixel higher than if it were not on the edge. This
+        //pattern repeats for the upper, left, right, and bottom face edges.
         if (direction == UP && row == sideSquares - 1) {
             sumAltitude[0] += map.get(0, squareX, squareY + halfEdge + 1);
             sumAltitude[1] += map.get(1, squareX, squareY + halfEdge + 1);
@@ -241,6 +286,9 @@ void diamondStep (
             setAltitude[5] = randHeight(rng, sumAltitude[5] / 4, range, subdivision)
         );
 
+        //If the manipulated square is on an edge, then the pixel adjacent to it on
+        //the adjacent face should be set to the same value. This pattern repeats
+        //for all edges of the face.
         if (direction == UP && row == sideSquares - 1) {
             map.set(0, squareX, squareY + 1, setAltitude[0]);
             map.set(1, squareX, squareY + 1, setAltitude[1]);
@@ -276,35 +324,36 @@ void diamondStep (
     }
 }
 
-// This is the serial version of the main algorithm. See the parallel version for
-// complete commentary.
+/**
+ * The serial version of the Diamond Square algorithm
+*/
+//For code commentary, see the parallel version
 void diamondSquare(CubeWorld& map) {
     double t1, t2;
-
-    ParallelRNG rng;
-    rng.reinitialize();
 
     //number of times the map will be subdivided
     size_t subdivisions = (size_t) log2(map.getSize() - 1);
 
-    initializeMap(map, subdivisions, rng);
+    ParallelRNG rng(pow(2,subdivisions - 1));
+
+    initializeMap(map, subdivisions, rng.getSequence(0));
 
     for (size_t subdivision = 0; subdivision < subdivisions; subdivision++) {
         size_t sideSquares = pow(2,subdivision); /* 1 << n */
         size_t sideLength = (map.getSize() - 1) / sideSquares; /* (length - 1) >> n */
 
-        rng.reinitialize();
-
         t1 = omp_get_wtime();
 
+        // For consistency, the parallel and serial versions of this algorithm access the random
+        // number generator the same way.
         for (size_t row = 0; row < sideSquares; row++) {
             for (size_t column = 0; column < sideSquares; column++) {
-                squareStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
+                squareStep(map, rng.getSequence(row), row, column, sideLength, sideSquares, RANGE, subdivision);
             }
         }
         for (size_t row = 0; row < sideSquares; row++) {
             for (size_t column = 0; column < sideSquares; column++) {
-                diamondStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
+                diamondStep(map, rng.getSequence(row), row, column, sideLength, sideSquares, RANGE, subdivision);
             }
         }
 
@@ -319,43 +368,54 @@ void diamondSquare(CubeWorld& map) {
     }
 }
 
+/**
+ * The parallel version of the Diamond Square algorithm.
+*/
 void diamondSquareParallel(CubeWorld& map) {
+    //To store timings for measuring performance
     double t1, t2;
-
-    ParallelRNG rng;
-    rng.reinitialize();
 
     //number of times the map will be subdivided
     size_t subdivisions = (size_t) log2(map.getSize() - 1);
 
-    initializeMap(map, subdivisions, rng);
+    ParallelRNG rng(pow(2,subdivisions - 1));
+
+    //initialize the corners of the faces
+    initializeMap(map, subdivisions, rng.getSequence(0));
 
     #pragma omp parallel
     {
+    /* This algorithm is run one subdivision at a time. The first subdivision divides a face into one square;
+     * the second divides a face into 4 squares; the third into 9 squares; and so on.
+    */
     for (size_t subdivision = 0; subdivision < subdivisions; subdivision++) {
+        //the number of squares on each side of a face in the current subdivision level
         size_t sideSquares = pow(2,subdivision); /* 1 << n */
+        //the length, in pixels, of each square that the faces will be divided into
         size_t sideLength = (map.getSize() - 1) / sideSquares; /* (length - 1) >> n */
 
-        #pragma omp single
-        {
-        rng.reinitialize();
-        }
+        t1 = omp_get_wtime(); //timing for performance
 
-        t1 = omp_get_wtime();
-
+        /* These loops run the diamond and square steps of the algorithm on the rows and colums of squares
+         * in the subdivision level. Since there can be as many as one parallel thread for each row of
+         * squares, the random number generators are accessed accordingly.
+        */
         #pragma omp for
         for (size_t row = 0; row < sideSquares; row++) {
             for (size_t column = 0; column < sideSquares; column++) {
-                squareStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
+                squareStep(map, rng.getSequence(row), row, column, sideLength, sideSquares, RANGE, subdivision);
             }
         }
+        //these steps cannot be folded into a single loop because the diamond step depends on
+        //information generated in the square step
         #pragma omp for
         for (size_t row = 0; row < sideSquares; row++) {
             for (size_t column = 0; column < sideSquares; column++) {
-                diamondStep(map, rng, row, column, sideLength, sideSquares, RANGE, subdivision);
+                diamondStep(map, rng.getSequence(row), row, column, sideLength, sideSquares, RANGE, subdivision);
             }
         }
 
+        //Outputs some profiling information. This should probably be removed at some point.
         #pragma omp single
         {
             t2 = omp_get_wtime();

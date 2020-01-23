@@ -3,65 +3,98 @@
 
 #include <gsl/gsl_rng.h>
 
-/*
-Because every random number generator requires its own state, when using the
-standard library random number generator in parallel, all threads have to block
-when using it. This results in extremely poor performance. This class solves
-that problem by creating a GNU Scientific Library random number generator for
-each thread. Moreover, it is completely transparent---simply initialize it in
-a parallel region and it will allocate a RNG for every thread, and every call
-will call the appropriate RNG for that thread.
+/**
+ * Provides access to a single random number generator
+*/
+class ParallelRNGSequence {
+    private:
+        gsl_rng *generator;
+    public:
+        /**
+         * This method is not meant to be used by anything other than a ParallelRNG instance, though
+         * it would cause no errors otherwise. This method constructs a Random Number Generator with
+         * a specified seed.
+         * @param seed The seed
+        */
+        ParallelRNGSequence(unsigned long seed) : generator(generator) {
+            generator = gsl_rng_alloc(gsl_rng_taus2);
+            gsl_rng_set(generator, seed);
+        };
+        /**
+         * Cleanly destroys an instance of this class
+        */
+        ~ParallelRNGSequence() {
+            gsl_rng_free(generator);
+        }
+        /**
+         * @return a double between 0 and 1
+        */
+        double getDouble() {
+            return gsl_rng_uniform(generator);
+        }
+        /**
+         * @return a double between -1 and 1
+        */
+        double getDoublePlusMinus() {
+            return getDouble() * 2.0 - 1.0;
+        }
+        /**
+         * Provides raw access to the GNU Scientific Library random number generator struct
+         * @return the underlying random number generator
+        */
+        gsl_rng *getRNG() {
+            return generator;
+        }
+};
+
+/**
+Random number generators require state, which means that they cannot be used in parallel.
+This class facilitates parallel optimization by instantiating an arbitrary number of
+random number generators. To execute in parallel, simply give each thread a different
+random number generator. For consistency between serial and parallel areas, it is
+important that these random number generators are used the same way in both---even
+though they do not need to be.
 */
 class ParallelRNG {
     private:
-        gsl_rng **generators = NULL;
+        ParallelRNGSequence **sequences;
         size_t quantity = 0;
-        bool activated = false;
     public:
-        ~ParallelRNG() {
-            if (activated) {
-                deinitialize();
-            }
-        }
-        void deinitialize() {
-            for (size_t i = 0; i < quantity; i++) {
-                gsl_rng_free(generators[i]);
-            }
-            delete[] generators;
-            
-            activated = false;
-        }
-        void initialize() {
-            quantity = omp_get_num_threads();
-
-            generators = new gsl_rng*[quantity];
+        /**
+         * Creates a number of random number generators.
+         * @param numSequences The number of random number generators to create
+        */
+        ParallelRNG(size_t numSequences) : quantity(numSequences) {
+            sequences = new ParallelRNGSequence*[quantity];
 
             gsl_rng* seeder = gsl_rng_alloc(gsl_rng_taus2);
 
             for (size_t i = 0; i < quantity; i++) {
-                generators[i] = gsl_rng_alloc(gsl_rng_taus2);
-                gsl_rng_set(generators[i], gsl_rng_get(seeder));
+                sequences[i] = new ParallelRNGSequence(gsl_rng_get(seeder));
             }
 
             gsl_rng_free(seeder);
-
-            activated = true;
         }
-        void reinitialize() {
-            if (activated) {
-                deinitialize();
+        /**
+         * Cleanly destroys all the random number generators
+        */
+        ~ParallelRNG() {
+            for (size_t i = 0; i < quantity; i++) {
+                delete sequences[i];
             }
-            initialize();
+            delete[] sequences;
         }
-        double getDouble() {
-            if (activated) {
-                return gsl_rng_uniform(generators[omp_get_thread_num()]);
-            }
-            return 0.0;
+        /**
+         * Gets a particular random number generator for use
+         * @param index Specifies which random number generator you want. This can be used to ensure consistency.
+         * @return A pointer to a ParallelRNGSequence, by which you can get random numbers
+        */
+        ParallelRNGSequence* getSequence(size_t index) {
+            return sequences[index];
         }
-        double getDoublePlusMinus() {
-            return getDouble() * 2.0 - 1.0;
-        }
+        /**
+         * @return The number of random number generators that can be used in parallel
+        */
         size_t getNumGenerators() {
             return quantity;
         }
