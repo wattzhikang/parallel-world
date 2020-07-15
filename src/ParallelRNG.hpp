@@ -64,10 +64,11 @@ class ParallelRNG {
          * Creates a number of random number generators.
          * @param numSequences The number of random number generators to create
         */
-        ParallelRNG(size_t numSequences) : quantity(numSequences) {
+        ParallelRNG(size_t numSequences, unsigned long int seed) : quantity(numSequences) {
             sequences = new ParallelRNGSequence*[quantity];
 
             gsl_rng* seeder = gsl_rng_alloc(gsl_rng_taus2);
+            gsl_rng_set(seeder, seed);
 
             for (size_t i = 0; i < quantity; i++) {
                 sequences[i] = new ParallelRNGSequence(gsl_rng_get(seeder));

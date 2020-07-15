@@ -6,7 +6,6 @@
 #include <iostream>
 #include <math.h>
 
-#include "ParallelRNG.hpp"
 
 /**
  * Returns the height, based on the supplied average height, and factored down by the current subdivision depth
@@ -328,13 +327,13 @@ void diamondStep (
  * The serial version of the Diamond Square algorithm
 */
 //For code commentary, see the parallel version
-void diamondSquare(CubeWorld& map) {
+void diamondSquare(CubeWorld& map, unsigned long seed) {
     double t1, t2;
 
     //number of times the map will be subdivided
     size_t subdivisions = (size_t) log2(map.getSize() - 1);
 
-    ParallelRNG rng(pow(2,subdivisions - 1));
+    ParallelRNG rng(pow(2,subdivisions - 1), seed);
 
     initializeMap(map, subdivisions, rng.getSequence(0));
 
@@ -371,14 +370,14 @@ void diamondSquare(CubeWorld& map) {
 /**
  * The parallel version of the Diamond Square algorithm.
 */
-void diamondSquareParallel(CubeWorld& map) {
+void diamondSquareParallel(CubeWorld& map, unsigned long seed) {
     //To store timings for measuring performance
     double t1, t2;
 
     //number of times the map will be subdivided
     size_t subdivisions = (size_t) log2(map.getSize() - 1);
 
-    ParallelRNG rng(pow(2,subdivisions - 1));
+    ParallelRNG rng(pow(2,subdivisions - 1), seed);
 
     //initialize the corners of the faces
     initializeMap(map, subdivisions, rng.getSequence(0));

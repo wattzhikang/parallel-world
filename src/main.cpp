@@ -24,6 +24,7 @@ struct options
     bool benchmark; ///< True if the user asked for benchmarks
     size_t benchmarkIntervals; ///< The number of benchmark intervals the user asked for
     bool help; ///< True if the user asked for the command line options
+    unsigned long seed; ///< The random seed. Defaults to 0
 };
 
 /**
@@ -44,6 +45,19 @@ int argInputFile(int argIndex, int argc, char *argv[], struct options *opts) {
     }
 
     return argIndex + 1;
+}
+
+/** \brief Reads a long from a string
+ *
+*/
+bool readLong(char *str, long *destination) { //TODO: use this for map size and other
+    char *endptr;                             //functions that need numbers
+    long size = strtol(str, &endptr, 0);
+    *destination = size;
+    if (endptr == str) {
+        return false;
+    }
+    return true;
 }
 
 /** \brief Gets the map size that the user specified
@@ -121,6 +135,20 @@ int argPower(int argIndex, int argc, char *argv[], struct options *opts) {
     return argIndex + 1;
 }
 
+/** \brief Gets the specified random seed
+ * 
+*/
+int argSeed(int argIndex, int argc, char *argv[], struct options *opts) {
+    long seed;
+    if (argIndex < argc && readLong(argv[argIndex], &seed)) {
+        opts->seed = seed;
+    } else {
+        opts->failure = true;
+        opts->failureMsg = "You must input a valid number for a random seed";
+    }
+    return argIndex + 1;
+}
+
 /** \brief Indicates that the user has requested the help options
  * 
 */ 
@@ -147,7 +175,8 @@ struct options parseArguments(int argc, char *argv[]) {
         .outputFileName =       NULL,
         .benchmark =            false,
         .benchmarkIntervals =   0,
-        .help =                 false
+        .help =                 false,
+        .seed =                 0l
     };
 
     // Runs through the command line tokens, finds the command switches, and
@@ -160,7 +189,10 @@ struct options parseArguments(int argc, char *argv[]) {
             // the next swtich.
             argIndex = argInputFile(argIndex + 1, argc, argv, &opts);
         }
-        else if (!strncmp(argv[argIndex], "-s", 3))
+        if (!strncmp(argv[argIndex], "-s", 3)) {
+            argIndex = argSeed(argIndex + 1, argc, argv, &opts);
+        }
+        else if (!strncmp(argv[argIndex], "-r", 3))
         {
             argIndex = argMapSize(argIndex + 1, argc, argv, &opts);
         }
@@ -210,10 +242,10 @@ void printStats(double timings[], size_t numTimings) {
 */
 const char *help[] = {
     "Usage:",
-    "\tparallel-world [-i <input_file>] [-s <map_size> | -p <map_power>] [-o <output_file>]",
+    "\tparallel-world [-i <input_file> | -s <random_seed>] [-r <map_resolution> | --power <map_power>] [-o <output_file>]",
     "\t\t[-b|--benchmark <intervals>] [ -h ]",
     "\t",
-    "\tMap size is the length of the side of a map. It must be 2^n + 1",
+    "\tMap resolution is the length of the side of a map. It must be 2^n + 1",
     "\t\twhere n is any positive integer."
 };
 const int helpLines = 5; ///< Number of lines in the usage
@@ -253,7 +285,7 @@ int main(int argc, char *argv[]) {
         for (size_t i = 0; i < opts.benchmarkIntervals; i++) {
             double t1 = omp_get_wtime();
 
-            diamondSquare(map);
+            diamondSquare(map, opts.seed);
 
             std::cout
                 << "Generation Time: "
@@ -270,7 +302,7 @@ int main(int argc, char *argv[]) {
         for (size_t i = 0; i < opts.benchmarkIntervals; i++) {
             double t1 = omp_get_wtime();
 
-            diamondSquareParallel(map);
+            diamondSquareParallel(map, opts.seed);
             
             std::cout
                 << "Generation Time: "
@@ -285,7 +317,7 @@ int main(int argc, char *argv[]) {
         std::cout << std::endl;
 
     } else {
-        diamondSquareParallel(map);
+        diamondSquareParallel(map, opts.seed);
     }
 
     if (opts.writeOutput)
