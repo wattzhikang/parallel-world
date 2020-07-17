@@ -13,7 +13,7 @@ struct transform {
 class CubeWorld {
     private:
         struct transform transformMap[6][4][4];
-        gsl_matrix *data[6];
+        gsl_matrix_float *data[6];
         size_t size;
 
         void initializeMatricies();
@@ -23,12 +23,15 @@ class CubeWorld {
         CubeWorld(size_t size);
         ~CubeWorld();
         size_t getSize();
-        double get(char face, long x, long y);
-        void set(char face, long x, long y, double value);
-        void setAll(double value);
+        float get(char face, long x, long y);
+        void set(char face, long x, long y, float value);
+        void setAll(float value);
 };
 
 void printTerrain(std::string title, CubeWorld& map);
 void printTerrain(CubeWorld& map);
+
+void printEquirectangular(std::string title, CubeWorld& map);
+void printEquirectangular(CubeWorld& map);
 
 #endif

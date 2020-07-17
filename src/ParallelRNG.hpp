@@ -29,14 +29,14 @@ class ParallelRNGSequence {
         /**
          * @return a double between 0 and 1
         */
-        double getDouble() {
-            return gsl_rng_uniform(generator);
+        float getFloat() {
+            return (float) gsl_rng_uniform(generator);
         }
         /**
          * @return a double between -1 and 1
         */
-        double getDoublePlusMinus() {
-            return getDouble() * 2.0 - 1.0;
+        float getFloatPlusMinus() {
+            return getFloat() * 2.0 - 1.0;
         }
         /**
          * Provides raw access to the GNU Scientific Library random number generator struct

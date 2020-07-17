@@ -14,8 +14,8 @@
  * @param range To specify the maximum amount by which to displace the terrain
  * @param subdivision This function reduces the range by a factor of 2 for every subdivison
 */
-double randHeight(ParallelRNGSequence* rng, double avg, double range, size_t subdivision) {
-    return avg + rng->getDoublePlusMinus() * (range / (1 << subdivision) /*pow(2, subdivision)*/);
+float randHeight(ParallelRNGSequence* rng, float avg, float range, size_t subdivision) {
+    return avg + rng->getFloatPlusMinus() * (range / (1 << subdivision) /*pow(2, subdivision)*/);
 }
 
 #define RANGE 0.5
@@ -29,15 +29,15 @@ double randHeight(ParallelRNGSequence* rng, double avg, double range, size_t sub
 void initializeMap(CubeWorld& map, size_t subdivisions, ParallelRNGSequence* rng) {
     //initialize map
     //face 4 corners
-    double face4LowerLeft = randHeight(rng, 0.5, RANGE, 0);
-    double face4LowerRight = randHeight(rng, 0.5, RANGE, 0);
-    double face4UpperLeft = randHeight(rng, 0.5, RANGE, 0);
-    double face4UpperRight = randHeight(rng, 0.5, RANGE, 0);
+    float face4LowerLeft = randHeight(rng, 0.5, RANGE, 0);
+    float face4LowerRight = randHeight(rng, 0.5, RANGE, 0);
+    float face4UpperLeft = randHeight(rng, 0.5, RANGE, 0);
+    float face4UpperRight = randHeight(rng, 0.5, RANGE, 0);
     //face 5 corners
-    double face5LowerLeft = randHeight(rng, 0.5, RANGE, 0);
-    double face5LowerRight = randHeight(rng, 0.5, RANGE, 0);
-    double face5UpperLeft = randHeight(rng, 0.5, RANGE, 0);
-    double face5UpperRight = randHeight(rng, 0.5, RANGE, 0);
+    float face5LowerLeft = randHeight(rng, 0.5, RANGE, 0);
+    float face5LowerRight = randHeight(rng, 0.5, RANGE, 0);
+    float face5UpperLeft = randHeight(rng, 0.5, RANGE, 0);
+    float face5UpperRight = randHeight(rng, 0.5, RANGE, 0);
 
     map.set(0, 0, 0, face5UpperLeft);
     map.set(0, map.getSize() - 1, 0, face5UpperRight);
@@ -87,18 +87,18 @@ void squareStep(
     size_t column,
     size_t sideLength,
     size_t sideSquares,
-    double range,
+    float range,
     size_t subdivision)
 {
     //Does the same thing to all 6 faces of the cube
     for (char face = 0; face < 6; face++)
     {
-        double sumAltitude = map.get(face, column*sideLength, row*sideLength);
+        float sumAltitude = map.get(face, column*sideLength, row*sideLength);
         sumAltitude       += map.get(face, column*sideLength, (row+1)*sideLength);
         sumAltitude       += map.get(face, (column+1)*sideLength, row*sideLength);
         sumAltitude       += map.get(face, (column+1)*sideLength, (row+1)*sideLength);
 
-        double avgAltitude = sumAltitude / 4;
+        float avgAltitude = sumAltitude / 4;
 
         map.set(
             face,
@@ -127,7 +127,7 @@ void diamondStep (
     size_t column,
     size_t sideLength,
     size_t sideSquares,
-    double range,
+    float range,
     size_t subdivision
 ) {
     size_t halfEdge = sideLength / 2;
@@ -135,7 +135,7 @@ void diamondStep (
     size_t diamondY = row*sideLength + halfEdge;
 
     size_t squareX, squareY;
-    double sumAltitude[6], setAltitude[6];
+    float sumAltitude[6], setAltitude[6];
 
     /*
         This is a bit convoluted. The whole point is to calculate the locations of the upper-middle,

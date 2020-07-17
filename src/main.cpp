@@ -25,6 +25,8 @@ struct options
     size_t benchmarkIntervals; ///< The number of benchmark intervals the user asked for
     bool help; ///< True if the user asked for the command line options
     unsigned long seed; ///< The random seed. Defaults to 0
+    bool writeRectangle; ///< True if the user asked to write an equirectangular projection
+    const char *outputEquirectangularFileName; ///< Name of the output file (equirectangular)
 };
 
 /**
@@ -87,6 +89,21 @@ int argOutputFile(int argIndex, int argc, char *argv[], struct options *opts) {
     
     if (argIndex < argc) {
         opts->outputFileName = argv[argIndex];
+    } else {
+        opts->failure = true;
+        opts->failureMsg = "You must specify a file name.";
+    }
+    return argIndex + 1;
+}
+
+/** \brief Gets the name of the user-specified equirectangular output file
+ * 
+*/
+int argOutputEquirectangular(int argIndex, int argc, char *argv[], struct options *opts) {
+    opts->writeRectangle = true;
+    
+    if (argIndex < argc) {
+        opts->outputEquirectangularFileName = argv[argIndex];
     } else {
         opts->failure = true;
         opts->failureMsg = "You must specify a file name.";
@@ -214,6 +231,9 @@ struct options parseArguments(int argc, char *argv[]) {
         {
             argIndex = argPower(argIndex + 1, argc, argv, &opts);
         }
+        else if (!strncmp(argv[argIndex], "-e", 3)) {
+            argIndex = argOutputEquirectangular(argIndex + 1, argc, argv, &opts);
+        }
         else
         {
             opts.failure = true;
@@ -243,7 +263,7 @@ void printStats(double timings[], size_t numTimings) {
 const char *help[] = {
     "Usage:",
     "\tparallel-world [-i <input_file> | -s <random_seed>] [-r <map_resolution> | --power <map_power>] [-o <output_file>]",
-    "\t\t[-b|--benchmark <intervals>] [ -h ]",
+    "\t\t[-b|--benchmark <intervals>] [-e <output_file>] [ -h ]",
     "\t",
     "\tMap resolution is the length of the side of a map. It must be 2^n + 1",
     "\t\twhere n is any positive integer."
@@ -323,6 +343,10 @@ int main(int argc, char *argv[]) {
     if (opts.writeOutput)
     {
         printTerrain(opts.outputFileName, map);
+    }
+
+    if (opts.writeRectangle) {
+        printEquirectangular(opts.outputEquirectangularFileName, map);
     }
 
     return 0;

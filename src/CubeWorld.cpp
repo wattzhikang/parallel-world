@@ -1,5 +1,7 @@
 #include "CubeWorld.hpp"
 
+#include "projector.hpp"
+
 void CubeWorld::initializeMatricies() {
     //                COS      SIN    0 ;  COS   SIN   0 ;  0    0    1
     #define ROT0     {1.0,  -( 0.0), 0.0,  0.0,  1.0, 0.0, 0.0, 0.0, 1.0}
@@ -197,14 +199,14 @@ void CubeWorld::navigate(char *face, long *x, long *y) {
 
 CubeWorld::CubeWorld(size_t size) : size(size) {
     for (size_t i = 0; i < 6; i++) {
-        data[i] = gsl_matrix_alloc(size, size);
+        data[i] = gsl_matrix_float_alloc(size, size);
     }
     initializeMatricies();
 }
 
 CubeWorld::~CubeWorld() {
     for (size_t i = 0; i < 6; i++) {
-        gsl_matrix_free(data[i]);
+        gsl_matrix_float_free(data[i]);
     }
 }
 
@@ -212,21 +214,21 @@ size_t CubeWorld::getSize() {
     return size;
 }
 
-double CubeWorld::get(char face, long x, long y) {
+float CubeWorld::get(char face, long x, long y) {
     navigate(&face, &x, &y);
-    return gsl_matrix_get(data[face], x, y);
+    return gsl_matrix_float_get(data[face], x, y);
 }
 
-void CubeWorld::set(char face, long x, long y, double value) {
+void CubeWorld::set(char face, long x, long y, float value) {
     navigate(&face, &x, &y);
-    gsl_matrix_set(data[face], x, y, value);
+    gsl_matrix_float_set(data[face], x, y, value);
 }
 
-void CubeWorld::setAll(double value) {
+void CubeWorld::setAll(float value) {
     for (char face = 0; face < 6; face++) {
         for (size_t x = 0; x < size; x++) {
             for (size_t y = 0; y < size; y++) {
-                gsl_matrix_set(data[face], x, y, value);
+                gsl_matrix_float_set(data[face], x, y, value);
             }
         }
     }
@@ -270,3 +272,57 @@ void printTerrain(std::string title, CubeWorld& map) {
 void printTerrain(CubeWorld& map) {
     printTerrain(std::string("output.bmp"), map);
 };
+
+void printEquirectangular(std::string title, CubeWorld& map) {
+    bitmap_image image(360*3, 180*3);
+
+    char face;
+    size_t xCar, yCar;
+
+    double pixel;
+
+    for (float y = -90; y < 90; y+=0.333) {
+        for (float x = -180; x < 180; x+=0.333) {
+                projector::getCartesian(map, y * (M_PI/180.0f), x * (M_PI/180.0f), &face, &xCar, &yCar);
+
+                //DEBUG: Use this to see if it is mapping faces correctly
+                // switch (face)
+                // {
+                // case 0:
+                //     faces.set_pixel((x+180)*3,(y+90)*3,0,0,0);
+                //     break;
+                // case 1:
+                //     faces.set_pixel((x+180)*3,(y+90)*3,100,0,0);
+                //     break;
+                // case 2:
+                //     faces.set_pixel((x+180)*3,(y+90)*3,255,0,0);
+                //     break;
+                // case 3:
+                //     faces.set_pixel((x+180)*3,(y+90)*3,255,100,0);
+                //     break;
+                // case 4:
+                //     faces.set_pixel((x+180)*3,(y+90)*3,255,255,0);
+                //     break;
+                // case 5:
+                //     faces.set_pixel((x+180)*3,(y+90)*3,255,255,100);
+                //     break;
+                // default:
+                //     break;
+                // }
+
+                pixel = map.get(face, xCar, yCar);
+                image.set_pixel(
+                    (x+180)*3, (y+90)*3,
+                    pixel * 254,
+                    pixel * 254,
+                    pixel * 254
+                );
+        }
+    }
+
+    image.save_image(title);
+}
+
+void printEquirectangular(CubeWorld& map) {
+    printEquirectangular("output-equirectangular.bmp", map);
+}
